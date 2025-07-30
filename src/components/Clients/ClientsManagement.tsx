@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Users, MapPin, Phone, Mail, Upload, Building2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, MapPin, Phone, Mail, Upload, Building2, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useData } from '../../contexts/DataContext';
 import { Client } from '../../types';
 
@@ -71,6 +72,108 @@ export const ClientsManagement: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    
+    if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      // Processar arquivo Excel
+      handleExcelImport(file);
+    } else if (fileExtension === 'csv') {
+      // Processar arquivo CSV (código existente)
+      handleCSVImport(file);
+    } else {
+      alert('❌ Formato de arquivo não suportado. Use apenas arquivos Excel (.xlsx, .xls) ou CSV (.csv)');
+    }
+  };
+
+  const handleExcelImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Usar a primeira planilha
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Converter para JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+        
+        if (jsonData.length < 2) {
+          alert('❌ Arquivo deve conter pelo menos um cabeçalho e uma linha de dados');
+          return;
+        }
+        
+        // Processar cabeçalho (primeira linha)
+        const headers = jsonData[0].map((h: any) => (h || '').toString().trim().toLowerCase());
+        const newClients: Omit<Client, 'id' | 'createdAt'>[] = [];
+        
+        // Validar cabeçalhos obrigatórios
+        const requiredHeaders = ['nome', 'endereco', 'cidade', 'telefone'];
+        const missingHeaders = requiredHeaders.filter(header => 
+          !headers.some(h => h.includes(header))
+        );
+        
+        if (missingHeaders.length > 0) {
+          alert(`❌ Cabeçalhos obrigatórios não encontrados: ${missingHeaders.join(', ')}\n\nCabeçalhos encontrados: ${headers.join(', ')}`);
+          return;
+        }
+        
+        // Processar dados (a partir da segunda linha)
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (!row || row.length === 0) continue;
+          
+          // Mapear colunas dinamicamente
+          const nameIndex = headers.findIndex(h => h.includes('nome'));
+          const addressIndex = headers.findIndex(h => h.includes('endereco') || h.includes('endereço'));
+          const altAddressIndex = headers.findIndex(h => h.includes('endereco_alternativo') || h.includes('endereço_alternativo') || h.includes('alternativo'));
+          const cityIndex = headers.findIndex(h => h.includes('cidade'));
+          const stateIndex = headers.findIndex(h => h.includes('uf') || h.includes('estado'));
+          const phoneIndex = headers.findIndex(h => h.includes('telefone'));
+          const emailIndex = headers.findIndex(h => h.includes('email'));
+          const transporterIndex = headers.findIndex(h => h.includes('transportadora'));
+          
+          const name = row[nameIndex]?.toString().trim();
+          const address = row[addressIndex]?.toString().trim();
+          const city = row[cityIndex]?.toString().trim();
+          const phone = row[phoneIndex]?.toString().trim();
+          
+          if (name && address && city && phone) {
+            newClients.push({
+              name,
+              address,
+              alternativeAddress: altAddressIndex >= 0 ? (row[altAddressIndex]?.toString().trim() || '') : '',
+              city,
+              state: stateIndex >= 0 ? (row[stateIndex]?.toString().trim() || '') : '',
+              phone,
+              email: emailIndex >= 0 ? (row[emailIndex]?.toString().trim() || '') : '',
+              isTransporter: transporterIndex >= 0 ? 
+                (row[transporterIndex]?.toString().toLowerCase() === 'true' || 
+                 row[transporterIndex]?.toString().toLowerCase() === 'sim' || 
+                 row[transporterIndex]?.toString().toLowerCase() === '1') : false,
+            });
+          }
+        }
+        
+        if (newClients.length > 0) {
+          importClients(newClients);
+          alert(`✅ ${newClients.length} cliente(s) importado(s) com sucesso do arquivo Excel!\n\nDetalhes:\n${newClients.map(c => `• ${c.name} - ${c.city}`).slice(0, 5).join('\n')}${newClients.length > 5 ? `\n... e mais ${newClients.length - 5} clientes` : ''}`);
+        } else {
+          alert('❌ Nenhum cliente válido encontrado no arquivo Excel');
+        }
+      } catch (error) {
+        console.error('Erro na importação Excel:', error);
+        alert('❌ Erro ao processar arquivo Excel. Verifique se:\n• O arquivo não está corrompido\n• Contém os campos obrigatórios: Nome, Endereço, Cidade, Telefone\n• Os dados estão organizados em colunas');
+      }
+      
+      setShowImportModal(false);
+    };
+    
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleCSVImport = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -78,7 +181,7 @@ export const ClientsManagement: React.FC = () => {
         const lines = content.split('\n').filter(line => line.trim());
         
         if (lines.length < 2) {
-          alert('Arquivo deve conter pelo menos um cabeçalho e uma linha de dados');
+          alert('❌ Arquivo deve conter pelo menos um cabeçalho e uma linha de dados');
           return;
         }
         
@@ -93,7 +196,7 @@ export const ClientsManagement: React.FC = () => {
         );
         
         if (missingHeaders.length > 0) {
-          alert(`Cabeçalhos obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
+          alert(`❌ Cabeçalhos obrigatórios não encontrados: ${missingHeaders.join(', ')}`);
           return;
         }
         
@@ -127,13 +230,13 @@ export const ClientsManagement: React.FC = () => {
         
         if (newClients.length > 0) {
           importClients(newClients);
-          alert(`✅ ${newClients.length} cliente(s) importado(s) com sucesso!\n\nDetalhes:\n${newClients.map(c => `• ${c.name} - ${c.city}`).slice(0, 5).join('\n')}${newClients.length > 5 ? `\n... e mais ${newClients.length - 5} clientes` : ''}`);
+          alert(`✅ ${newClients.length} cliente(s) importado(s) com sucesso do arquivo CSV!\n\nDetalhes:\n${newClients.map(c => `• ${c.name} - ${c.city}`).slice(0, 5).join('\n')}${newClients.length > 5 ? `\n... e mais ${newClients.length - 5} clientes` : ''}`);
         } else {
-          alert('❌ Nenhum cliente válido encontrado no arquivo');
+          alert('❌ Nenhum cliente válido encontrado no arquivo CSV');
         }
       } catch (error) {
-        console.error('Erro na importação:', error);
-        alert('❌ Erro ao processar arquivo. Verifique se:\n• O arquivo está em formato CSV\n• As colunas estão separadas por vírgula\n• Contém os campos obrigatórios: Nome, Endereço, Cidade, Telefone');
+        console.error('Erro na importação CSV:', error);
+        alert('❌ Erro ao processar arquivo CSV. Verifique se:\n• O arquivo está em formato CSV\n• As colunas estão separadas por vírgula\n• Contém os campos obrigatórios: Nome, Endereço, Cidade, Telefone');
       }
       
       setShowImportModal(false);
@@ -143,18 +246,71 @@ export const ClientsManagement: React.FC = () => {
   };
 
   const downloadTemplate = () => {
-    const template = `Nome,Endereço,Endereço_Alternativo,Cidade,UF,Telefone,Email,É_Transportadora
-Empresa ABC Ltda,"Rua das Flores, 123 - Centro","Rua Alternativa, 456",São Paulo,SP,(11) 1111-1111,contato@empresaabc.com,false
-Transportadora XYZ,"Av. Industrial, 456 - Zona Norte",,São Paulo,SP,(11) 2222-2222,operacao@transportadoraxyz.com,true
-Loja DEF,"Rua Comercial, 789 - Vila Madalena",,São Paulo,SP,(11) 3333-3333,vendas@lojadef.com,false
-Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paulo,SP,(11) 4444-4444,,false`;
-    const blob = new Blob([template], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'modelo-importacao-clientes.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    // Criar dados de exemplo
+    const templateData = [
+      {
+        'Nome': 'Empresa ABC Ltda',
+        'Endereço': 'Rua das Flores, 123 - Centro',
+        'Endereço_Alternativo': 'Rua Alternativa, 456',
+        'Cidade': 'São Paulo',
+        'UF': 'SP',
+        'Telefone': '(11) 1111-1111',
+        'Email': 'contato@empresaabc.com',
+        'É_Transportadora': 'false'
+      },
+      {
+        'Nome': 'Transportadora XYZ',
+        'Endereço': 'Av. Industrial, 456 - Zona Norte',
+        'Endereço_Alternativo': '',
+        'Cidade': 'São Paulo',
+        'UF': 'SP',
+        'Telefone': '(11) 2222-2222',
+        'Email': 'operacao@transportadoraxyz.com',
+        'É_Transportadora': 'true'
+      },
+      {
+        'Nome': 'Loja DEF',
+        'Endereço': 'Rua Comercial, 789 - Vila Madalena',
+        'Endereço_Alternativo': '',
+        'Cidade': 'São Paulo',
+        'UF': 'SP',
+        'Telefone': '(11) 3333-3333',
+        'Email': 'vendas@lojadef.com',
+        'É_Transportadora': 'false'
+      },
+      {
+        'Nome': 'Cliente GHI',
+        'Endereço': 'Alameda Santos, 321 - Jardins',
+        'Endereço_Alternativo': 'Alameda Alternativa, 654',
+        'Cidade': 'São Paulo',
+        'UF': 'SP',
+        'Telefone': '(11) 4444-4444',
+        'Email': '',
+        'É_Transportadora': 'false'
+      }
+    ];
+
+    // Criar workbook Excel
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    
+    // Ajustar largura das colunas
+    const colWidths = [
+      { wch: 20 }, // Nome
+      { wch: 30 }, // Endereço
+      { wch: 25 }, // Endereço_Alternativo
+      { wch: 15 }, // Cidade
+      { wch: 5 },  // UF
+      { wch: 15 }, // Telefone
+      { wch: 25 }, // Email
+      { wch: 15 }  // É_Transportadora
+    ];
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Modelo Clientes');
+    
+    // Salvar arquivo
+    XLSX.writeFile(wb, 'modelo-importacao-clientes.xlsx');
   };
 
   return (
@@ -402,18 +558,20 @@ Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paul
                   📋 <strong>Como importar clientes:</strong>
                 </p>
                 <ul className="list-disc list-inside space-y-1 mb-4">
-                  <li>Arquivo deve estar em formato <strong>CSV</strong></li>
+                  <li>Arquivo pode ser <strong>Excel (.xlsx, .xls)</strong> ou <strong>CSV</strong></li>
                   <li>Colunas obrigatórias: <strong>Nome, Endereço, Cidade, Telefone</strong></li>
                   <li>Colunas opcionais: <strong>UF, Email, É Transportadora</strong></li>
-                  <li>Use vírgula (,) para separar as colunas</li>
-                  <li>Para transportadoras, use "true" ou "sim" na última coluna</li>
+                  <li>Para Excel: dados devem estar organizados em colunas na primeira planilha</li>
+                  <li>Para CSV: use vírgula (,) para separar as colunas</li>
+                  <li>Para transportadoras, use "true", "sim" ou "1"</li>
                 </ul>
                 
                 <button
                   onClick={downloadTemplate}
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-700 underline font-medium"
                 >
-                  📥 Baixar modelo de planilha (CSV)
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Baixar modelo de planilha Excel
                 </button>
               </div>
 
@@ -422,16 +580,16 @@ Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paul
                 <p className="text-sm text-gray-600 mb-2">Arraste o arquivo aqui ou</p>
                 <label className="cursor-pointer">
                   <span className="text-blue-600 hover:text-blue-700">
-                    Clique para selecionar arquivo CSV
+                    Clique para selecionar arquivo Excel ou CSV
                   </span>
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".xlsx,.xls,.csv"
                     onChange={handleFileImport}
                     className="hidden"
                   />
                 </label>
-                <p className="text-xs text-gray-500 mt-2">Apenas arquivos CSV são aceitos</p>
+                <p className="text-xs text-gray-500 mt-2">Arquivos Excel (.xlsx, .xls) ou CSV são aceitos</p>
               </div>
 
               <div className="flex gap-3 pt-4">

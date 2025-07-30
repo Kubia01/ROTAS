@@ -1,12 +1,28 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, DollarSign, Upload, Calendar, Car, Receipt, Fuel, Wrench, CreditCard } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Expense } from '../../types';
 
 export const ExpensesManagement: React.FC = () => {
   const { expenses, vehicles, routes, addExpense, updateExpense, deleteExpense } = useData();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  const isAdmin = user?.role === 'admin';
+  const isDriver = user?.role === 'driver';
+  
+  // Para motoristas, filtrar apenas gastos de suas rotas
+  const filteredExpenses = isDriver 
+    ? expenses.filter(expense => {
+        if (expense.routeId) {
+          const route = routes.find(r => r.id === expense.routeId);
+          return route && route.driver.email === user?.email;
+        }
+        return false;
+      })
+    : expenses;
   const [formData, setFormData] = useState({
     routeId: '',
     vehicleId: '',
@@ -111,12 +127,12 @@ export const ExpensesManagement: React.FC = () => {
     }
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const monthlyExpenses = expenses
+  const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const monthlyExpenses = filteredExpenses
     .filter(expense => new Date(expense.date).getMonth() === new Date().getMonth())
     .reduce((sum, expense) => sum + expense.amount, 0);
 
-  const expensesByType = expenses.reduce((acc, expense) => {
+  const expensesByType = filteredExpenses.reduce((acc, expense) => {
     acc[expense.type] = (acc[expense.type] || 0) + expense.amount;
     return acc;
   }, {} as Record<string, number>);
@@ -125,16 +141,22 @@ export const ExpensesManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestão de Gastos</h2>
-          <p className="text-gray-600">Controle todos os gastos operacionais da frota</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {isDriver ? 'Meus Gastos' : 'Gestão de Gastos'}
+          </h2>
+          <p className="text-gray-600">
+            {isDriver ? 'Visualize seus gastos registrados' : 'Controle todos os gastos operacionais da frota'}
+          </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Gasto
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Gasto
+          </button>
+        )}
       </div>
 
       {/* Resumo Financeiro */}
@@ -208,7 +230,7 @@ export const ExpensesManagement: React.FC = () => {
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {expenses.map((expense) => {
+            {filteredExpenses.map((expense) => {
               const vehicle = vehicles.find(v => v.id === expense.vehicleId);
               const route = expense.routeId ? routes.find(r => r.id === expense.routeId) : null;
               
@@ -243,20 +265,22 @@ export const ExpensesManagement: React.FC = () => {
                         </p>
                       </div>
                       
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(expense)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(expense.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(expense)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(expense.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -266,8 +290,8 @@ export const ExpensesManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
+      {/* Modal - Apenas para Administradores */}
+      {isModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-200">

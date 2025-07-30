@@ -35,6 +35,7 @@ export interface Client {
   address: string;
   alternativeAddress?: string;
   city: string;
+  state?: string; // UF
   phone: string;
   email?: string;
   coordinates?: {
@@ -60,6 +61,8 @@ export interface DeliveryStop {
   observations?: string;
   photos: string[];
   signature?: string;
+  invoiceNumber?: string; // Nota fiscal
+  clientCode?: string; // Código do cliente
   recipientData?: {
     name: string;
     cpf: string;

@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
 import { Plus, MapPin, Clock, User, Car, Calendar } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Route, DeliveryStop } from '../../types';
 import { RouteForm } from './RouteForm';
 import { RouteDetails } from './RouteDetails';
 
 export const RoutesManagement: React.FC = () => {
   const { routes, drivers, vehicles, clients } = useData();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
+
+  const isAdmin = user?.role === 'admin';
+  const isDriver = user?.role === 'driver';
+  
+  // Para motoristas, filtrar apenas suas rotas
+  const filteredRoutes = isDriver 
+    ? routes.filter(route => route.driver.email === user?.email)
+    : routes;
 
   const getRouteStatusColor = (status: string) => {
     switch (status) {
@@ -51,16 +61,22 @@ export const RoutesManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestão de Rotas</h2>
-          <p className="text-gray-600">Planeje e gerencie as rotas de entrega</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {isDriver ? 'Minhas Rotas' : 'Gestão de Rotas'}
+          </h2>
+          <p className="text-gray-600">
+            {isDriver ? 'Visualize suas rotas e entregas atribuídas' : 'Planeje e gerencie as rotas de entrega'}
+          </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Rota
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Rota
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -89,7 +105,7 @@ export const RoutesManagement: React.FC = () => {
 
       {/* Lista de Rotas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {routes.map((route) => (
+        {filteredRoutes.map((route) => (
           <div key={route.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
@@ -171,22 +187,30 @@ export const RoutesManagement: React.FC = () => {
         ))}
       </div>
 
-      {routes.length === 0 && (
+      {filteredRoutes.length === 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma rota encontrada</h3>
-          <p className="text-gray-500 mb-6">Comece criando sua primeira rota de entrega</p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Criar Nova Rota
-          </button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {isDriver ? 'Nenhuma rota atribuída' : 'Nenhuma rota encontrada'}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {isDriver 
+              ? 'Aguarde o administrador atribuir rotas para você' 
+              : 'Comece criando sua primeira rota de entrega'}
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Criar Nova Rota
+            </button>
+          )}
         </div>
       )}
 
-      {/* Modal de Nova Rota */}
-      {isModalOpen && (
+      {/* Modal de Nova Rota - Apenas para Administradores */}
+      {isModalOpen && isAdmin && (
         <RouteForm
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

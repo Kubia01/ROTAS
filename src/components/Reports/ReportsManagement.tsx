@@ -11,6 +11,7 @@ import {
   FileText,
   Filter
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useData } from '../../contexts/DataContext';
 
 export const ReportsManagement: React.FC = () => {
@@ -118,29 +119,87 @@ export const ReportsManagement: React.FC = () => {
   };
 
   const exportReport = () => {
-    const { startDate, endDate } = filteredData;
-    const reportData = {
-      periodo: getPeriodText(),
-      dataInicio: startDate.toLocaleDateString('pt-BR'),
-      dataFim: endDate.toLocaleDateString('pt-BR'),
-      resumo: {
-        totalEntregas: reportStats.totalDeliveries,
-        totalKm: reportStats.totalKm,
-        totalGastos: reportStats.totalExpenses,
-        rotasConcluidas: reportStats.completedRoutes,
-      },
-      motoristas: reportStats.driverStats,
-      gastosPorTipo: reportStats.expensesByType,
-    };
+    const { routes: filteredRoutes } = filteredData;
+    
+    // Aba 1: ENTREGA
+    const deliveryData = [];
+    filteredRoutes.forEach(route => {
+      route.stops.forEach(stop => {
+        if (stop.status === 'completed') {
+          const waitTime = stop.entryTime && stop.exitTime 
+            ? Math.round((stop.exitTime.getTime() - stop.entryTime.getTime()) / (1000 * 60)) 
+            : 0;
+          
+          deliveryData.push({
+            'NOTA FISCAL': stop.invoiceNumber || '',
+            'CÓDIGO DO CLIENTE': stop.clientCode || '',
+            'NOME DO CLIENTE': stop.client.name,
+            'TRANSPORTADORA': stop.transporter?.name || '',
+            'CIDADE': stop.client.city,
+            'UF': stop.client.state || '',
+            'HORÁRIO DE CHEGADA NO CLIENTE': stop.entryTime ? stop.entryTime.toLocaleTimeString('pt-BR') : '',
+            'HORÁRIO DE SAÍDA NO CLIENTE': stop.exitTime ? stop.exitTime.toLocaleTimeString('pt-BR') : '',
+            'TEMPO DE ESPERA NO CLIENTE': `${waitTime} min`,
+            'DATA': new Date(route.date).toLocaleDateString('pt-BR')
+          });
+        }
+      });
+    });
 
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `relatorio-tws-${selectedPeriod}-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    // Aba 2: INFORMAÇÕES DA VAN
+    const vanData = [];
+    const routesByDate = filteredRoutes.reduce((acc, route) => {
+      const dateKey = new Date(route.date).toLocaleDateString('pt-BR');
+      if (!acc[dateKey]) acc[dateKey] = [];
+      acc[dateKey].push(route);
+      return acc;
+    }, {} as Record<string, typeof filteredRoutes>);
+
+    Object.entries(routesByDate).forEach(([date, routesForDate]) => {
+      routesForDate.forEach(route => {
+        if (route.status === 'completed') {
+          const totalStops = route.stops.length;
+          const completedStops = route.stops.filter(s => s.status === 'completed').length;
+          const completionPercentage = totalStops > 0 ? Math.round((completedStops / totalStops) * 100) : 0;
+          const uncompletedDeliveries = totalStops - completedStops;
+          
+          vanData.push({
+            'DATA': date,
+            'HORÁRIO DE SAÍDA': route.startTime ? route.startTime.toLocaleTimeString('pt-BR') : '',
+            'HORÁRIO DE CHEGADA': route.endTime ? route.endTime.toLocaleTimeString('pt-BR') : '',
+            'KM DE SAÍDA': route.startKm || 0,
+            'KM DE CHEGADA': route.endKm || 0,
+            'KM RODADO (KM)': route.totalKm || 0,
+            'ENTREGAS NÃO REALIZADAS': uncompletedDeliveries,
+            'PORCENTAGEM DE CONCLUSÃO': `${completionPercentage}%`,
+            'NUMERO DE ENTREGAS': totalStops
+          });
+        }
+      });
+    });
+
+    // Aba 3: ENTREGAS COM MAIS DE 40 MINUTOS DE ESPERA
+    const longWaitDeliveries = deliveryData.filter(delivery => {
+      const waitTimeStr = delivery['TEMPO DE ESPERA NO CLIENTE'];
+      const waitTime = parseInt(waitTimeStr.replace(' min', ''));
+      return waitTime > 40;
+    });
+
+    // Criar workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Adicionar as três abas
+    const ws1 = XLSX.utils.json_to_sheet(deliveryData);
+    const ws2 = XLSX.utils.json_to_sheet(vanData);
+    const ws3 = XLSX.utils.json_to_sheet(longWaitDeliveries);
+    
+    XLSX.utils.book_append_sheet(wb, ws1, 'ENTREGA');
+    XLSX.utils.book_append_sheet(wb, ws2, 'INFORMAÇÕES DA VAN');
+    XLSX.utils.book_append_sheet(wb, ws3, 'ENTREGAS > 40min');
+    
+    // Salvar arquivo
+    const fileName = `relatorio-entregas-${getPeriodText().replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   return (
@@ -155,7 +214,7 @@ export const ReportsManagement: React.FC = () => {
           className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
         >
           <Download className="w-4 h-4" />
-          Exportar Relatório
+                      Exportar Excel
         </button>
       </div>
 

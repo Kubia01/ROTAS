@@ -35,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'my-routes', label: 'Minhas Rotas', icon: Route },
     { id: 'delivery-form', label: 'Formulário Entrega', icon: FileText },
+    { id: 'expenses', label: 'Meus Gastos', icon: DollarSign },
   ];
 
   const menuItems = user?.role === 'admin' ? adminMenuItems : driverMenuItems;

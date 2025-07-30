@@ -42,6 +42,8 @@ export const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBack }) => 
     entryTime: '',
     exitTime: '',
     observations: '',
+    invoiceNumber: '',
+    clientCode: '',
     recipientName: '',
     recipientCpf: '',
     recipientEmail: '',
@@ -132,6 +134,8 @@ export const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBack }) => 
             entryTime: deliveryForm.entryTime ? new Date(`${new Date().toDateString()} ${deliveryForm.entryTime}`) : undefined,
             exitTime: deliveryForm.exitTime ? new Date(`${new Date().toDateString()} ${deliveryForm.exitTime}`) : undefined,
             observations: deliveryForm.observations,
+            invoiceNumber: deliveryForm.invoiceNumber,
+            clientCode: deliveryForm.clientCode,
             recipientData: {
               name: deliveryForm.recipientName,
               cpf: deliveryForm.recipientCpf,
@@ -157,6 +161,8 @@ export const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBack }) => 
       entryTime: '',
       exitTime: '',
       observations: '',
+      invoiceNumber: '',
+      clientCode: '',
       recipientName: '',
       recipientCpf: '',
       recipientEmail: '',
@@ -548,6 +554,34 @@ export const RouteDetails: React.FC<RouteDetailsProps> = ({ route, onBack }) => 
                     value={deliveryForm.exitTime}
                     onChange={(e) => setDeliveryForm({ ...deliveryForm, exitTime: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nota Fiscal
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryForm.invoiceNumber}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, invoiceNumber: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Número da nota fiscal"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Código do Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryForm.clientCode}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, clientCode: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Código do cliente"
                   />
                 </div>
               </div>

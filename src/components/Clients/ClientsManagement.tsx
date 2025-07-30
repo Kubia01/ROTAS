@@ -13,6 +13,7 @@ export const ClientsManagement: React.FC = () => {
     address: '',
     alternativeAddress: '',
     city: '',
+    state: '',
     phone: '',
     email: '',
     isTransporter: false,
@@ -36,6 +37,7 @@ export const ClientsManagement: React.FC = () => {
       address: '',
       alternativeAddress: '',
       city: '',
+      state: '',
       phone: '',
       email: '',
       isTransporter: false,
@@ -51,6 +53,7 @@ export const ClientsManagement: React.FC = () => {
       address: client.address,
       alternativeAddress: client.alternativeAddress || '',
       city: client.city,
+      state: client.state || '',
       phone: client.phone,
       email: client.email || '',
       isTransporter: client.isTransporter,
@@ -103,6 +106,7 @@ export const ClientsManagement: React.FC = () => {
             const addressIndex = headers.findIndex(h => h.includes('endereco') || h.includes('endereço'));
             const altAddressIndex = headers.findIndex(h => h.includes('endereco_alternativo') || h.includes('endereço_alternativo'));
             const cityIndex = headers.findIndex(h => h.includes('cidade'));
+            const stateIndex = headers.findIndex(h => h.includes('uf') || h.includes('estado'));
             const phoneIndex = headers.findIndex(h => h.includes('telefone'));
             const emailIndex = headers.findIndex(h => h.includes('email'));
             const transporterIndex = headers.findIndex(h => h.includes('transportadora'));
@@ -112,6 +116,7 @@ export const ClientsManagement: React.FC = () => {
               address: data[addressIndex] || data[1],
               alternativeAddress: altAddressIndex >= 0 ? data[altAddressIndex] : '',
               city: data[cityIndex] || data[2],
+              state: stateIndex >= 0 ? data[stateIndex] : '',
               phone: data[phoneIndex] || data[3],
               email: data[emailIndex] || '',
               isTransporter: data[transporterIndex]?.toLowerCase() === 'true' || 
@@ -138,11 +143,11 @@ export const ClientsManagement: React.FC = () => {
   };
 
   const downloadTemplate = () => {
-    const template = `Nome,Endereço,Endereço_Alternativo,Cidade,Telefone,Email,É_Transportadora
-Empresa ABC Ltda,"Rua das Flores, 123 - Centro","Rua Alternativa, 456",São Paulo,(11) 1111-1111,contato@empresaabc.com,false
-Transportadora XYZ,"Av. Industrial, 456 - Zona Norte",,São Paulo,(11) 2222-2222,operacao@transportadoraxyz.com,true
-Loja DEF,"Rua Comercial, 789 - Vila Madalena",,São Paulo,(11) 3333-3333,vendas@lojadef.com,false
-Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paulo,(11) 4444-4444,,false`;
+    const template = `Nome,Endereço,Endereço_Alternativo,Cidade,UF,Telefone,Email,É_Transportadora
+Empresa ABC Ltda,"Rua das Flores, 123 - Centro","Rua Alternativa, 456",São Paulo,SP,(11) 1111-1111,contato@empresaabc.com,false
+Transportadora XYZ,"Av. Industrial, 456 - Zona Norte",,São Paulo,SP,(11) 2222-2222,operacao@transportadoraxyz.com,true
+Loja DEF,"Rua Comercial, 789 - Vila Madalena",,São Paulo,SP,(11) 3333-3333,vendas@lojadef.com,false
+Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paulo,SP,(11) 4444-4444,,false`;
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -296,17 +301,33 @@ Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paul
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cidade
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    UF
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })}
+                    placeholder="SP"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
               </div>
 
               <div>
@@ -383,7 +404,7 @@ Cliente GHI,"Alameda Santos, 321 - Jardins","Alameda Alternativa, 654",São Paul
                 <ul className="list-disc list-inside space-y-1 mb-4">
                   <li>Arquivo deve estar em formato <strong>CSV</strong></li>
                   <li>Colunas obrigatórias: <strong>Nome, Endereço, Cidade, Telefone</strong></li>
-                  <li>Colunas opcionais: <strong>Email, É Transportadora</strong></li>
+                  <li>Colunas opcionais: <strong>UF, Email, É Transportadora</strong></li>
                   <li>Use vírgula (,) para separar as colunas</li>
                   <li>Para transportadoras, use "true" ou "sim" na última coluna</li>
                 </ul>
